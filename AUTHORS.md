@@ -54,7 +54,24 @@ And the full list of contributors of these files are:
     - Lex Spoon (ls)
     - Nicolas Cellier (nice)
     - Levente Uzonyi (ul)
-    
+
+## Original authors of FutureMaker (21th June 2020)
+
+The `FutureMaker` class was exported from `Squeak5.3-19431-64bit` to get
+the `PromiseTest` to pass as it depended on `#future` which was implemented
+on the `Object` class in Squeak.
+
+The contributors of this class were:
+
+    - ? (das)
+    - Eliot Emilio Miranda (eem)
+    - Joshua Gargus (jcg)
+    - Nicolas Cellier (nice)
+
+Before making the sha256sum over it, the carriage returns were converted to newline.
+The sha256sum of this file is:
+
+> 950838966ba40337e53df8ed6994f71143d8868193101e042e5e412dc35e2bb4  References/FutureMaker.st
 
 # Author of the (initial) porting effort
 
