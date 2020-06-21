@@ -1,10 +1,10 @@
-'From Cuis 5.0 [latest update: #4191] on 21 June 2020 at 12:29:47 pm'!
+'From Cuis 5.0 [latest update: #4191] on 21 June 2020 at 1:51:29 pm'!
 'Description Port of Squeak Actors (See https://tonyg.github.io/squeak-actors) to Cuis.
 
 License: MIT
 Copyright (c) 2020 Josef Philip Bernhart (Port)
 Copyright (c) 2018, 2019, 2020 Tony Garnock-Jones (Squeak Actors Author)'!
-!provides: 'Actors' 1 1!
+!provides: 'Actors' 1 2!
 !requires: 'Concurrency-Kernel' 1 0 nil!
 SystemOrganization addCategory: #Actors!
 SystemOrganization addCategory: #'Actors-Dataspace'!
@@ -3711,10 +3711,10 @@ rejectWith: v
 			Actor current tracer traceRequest: self rejectedWith: v.
 			promise rejectWith: v ]]! !
 
-!ActorRequest methodsFor: 'resolving' stamp: 'tonyg 2/4/2018 16:21'!
+!ActorRequest methodsFor: 'resolving' stamp: 'jpb 6/21/2020 13:23:20'!
 resolveWith: v
 	"Public. Causes the remote peer's promise to be resolved with the given value."
-	v isPromise
+	(v is: #Promise)
 		ifTrue: [
 			v whenResolved: [:w | self resolveWith: w].
 			v whenRejected: [:e | self rejectWith: e ] ]

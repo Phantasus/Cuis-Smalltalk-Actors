@@ -2,6 +2,17 @@
 
 This file records a description of changes, if known and cared about.
 
+## Update 0.0001a
+
+Affected files:
+
+- Actors 1.2
+- Concurrency-Kernel 1.1
+
+Makes most of the `PromiseTest` testcases pass, only the ones which
+depend on working futures are still broken. Adds the `FutureMaker`
+class from Squeak to the `Concurrency-Kernel`.
+
 
 ## Update 0.0001
 

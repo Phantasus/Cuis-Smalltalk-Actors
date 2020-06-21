@@ -1,8 +1,8 @@
-'From Cuis 5.0 [latest update: #4191] on 21 June 2020 at 12:29:49 pm'!
+'From Cuis 5.0 [latest update: #4191] on 21 June 2020 at 1:51:30 pm'!
 'Description Contains models, datatypes for concurrency related processing. For example specialized kinds of queues and promises.
 
 License: MIT'!
-!provides: 'Concurrency-Kernel' 1 0!
+!provides: 'Concurrency-Kernel' 1 1!
 SystemOrganization addCategory: #'Concurrency-Kernel'!
 SystemOrganization addCategory: #'Concurrency-Kernel-Tests'!
 
@@ -47,6 +47,16 @@ Object subclass: #Promise
 Promise class
 	instanceVariableNames: ''!
 
+!classDefinition: #FutureMaker category: #'Concurrency-Kernel'!
+ProtoObject subclass: #FutureMaker
+	instanceVariableNames: 'myTarget deltaMSecs'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Concurrency-Kernel'!
+!classDefinition: 'FutureMaker class' category: #'Concurrency-Kernel'!
+FutureMaker class
+	instanceVariableNames: ''!
+
 
 !MonitoredSharedQueue commentStamp: 'ls 6/25/2005 13:48' prior: 0!
 An implementation of a shared queue based on class Monitor.  Clients may may place items on the queue using nextPut: or remove them using methods like next or nextOrNil.  Items are removed in first-in first-out (FIFO) order.  It is safe for multiple threads to access the same shared queue, which is why this is a "shared" queue.
@@ -73,6 +83,9 @@ I also implement the Promises/A+ Javascript specification. This allows you to ch
 A Promise may be in one of three possible states: #pending, #fulfilled or #rejected. A Promise may move from #pending -> #fulfilled (by way of the resolveWith: message), or from #pending -> #rejected (by way of rejectWith:). No other state changes may occur.
 
 Once #fulfilled or #rejected, a Promise's value must not change. In keeping with the major Javascript Promise implementations' interpretations of this, calls to resolveWith: or rejectWith: when a Promise is in #fulfilled or #rejected state are simply ignored - an error is not signalled. (See test cases PromiseTest testFirstResolutionWins, testCannotRejectFulfilledPromise and testCannotResolveaRejectedPromise.)!
+
+!FutureMaker commentStamp: 'jcg 12/17/2009 23:24' prior: 0!
+Uses #doesNotUnderstand: to transform messages into future messages.  In practice, this class is never used; for efficiency, the Compiler has been modified to use FutureNode to transform code at compile-time to directly send #futureSend:at:args:.  However, this is simply an optimization... the semantics are unchanged.!
 
 !MonitoredSharedQueue methodsFor: 'printing' stamp: 'ls 6/25/2005 13:56'!
 printOn: aStream
@@ -108,6 +121,16 @@ printOn: aStream
 			nextPutAll: '(rejected: ';
 			nextPutAll: error printString;
 			nextPutAll: ')'].! !
+
+!FutureMaker methodsFor: 'printing' stamp: 'das 9/7/2005 10:10'!
+printOn: aStream
+	"Append to the argument, aStream, a sequence of characters that  
+	identifies the receiver."
+	| title |
+	title := self class name.
+	aStream
+		nextPutAll: (title first isVowel ifTrue: ['an '] ifFalse: ['a ']);
+		nextPutAll: title! !
 
 !MonitoredSharedQueue methodsFor: 'accessing' stamp: 'ls 6/25/2005 14:07'!
 flush
@@ -269,16 +292,17 @@ testFirstResolutionWins
 	self assert: p value == 1.
 ! !
 
-!PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/20/2013 20:36'!
+!PromiseTest methodsFor: 'tests - monad' stamp: 'jpb 6/21/2020 13:51:15'!
 testRejectWithInvokesErrorHandlers
 	| p error returnedError |
 	returnedError := nil.
-	error := KeyNotFound new.
+	error := Error new.
 	p := Promise ifRejected: [:e | returnedError := e].
 	p rejectWith: error.
+	
 	self assert: returnedError notNil description: 'Error block did not run.'.
-	self assert: error equals: returnedError description: 'Error not passed into block'.
-	self assert: error equals: p error description: 'Promise didn''t store error'.! !
+	self assert: error equals: returnedError.
+	self assert: error equals: p error.! !
 
 !PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/23/2013 17:35'!
 testThenPermitsChainingOfPromises
@@ -335,15 +359,15 @@ testifRejectedDoesNotRunBlockIfPromiseResolves
 	self deny: q isRejected.
 	self assert: nil equals: error.! !
 
-!PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/26/2013 14:13'!
+!PromiseTest methodsFor: 'tests - monad' stamp: 'jpb 6/21/2020 13:50:33'!
 testifRejectedRunsBlockIfPromiseFails
 	| p q error |
 	error := nil.
 	p := Promise new.
 	q := p ifRejected: [:e | error := e].
-	p rejectWith: KeyNotFound new.
+	p rejectWith: Error new.
 	self assert: q isRejected.
-	self assert: KeyNotFound equals: error class.! !
+	self assert: Error equals: error class.! !
 
 !PromiseTest methodsFor: 'tests' stamp: 'jcg 4/5/2010 00:36'!
 testChainedResolvers
@@ -468,13 +492,17 @@ waitUntil: aBlock orCycleCount: anInteger
 		counter >= anInteger ifTrue: [^ false].
 	] repeat! !
 
-!Promise methodsFor: 'private' stamp: 'fbs 5/20/2013 09:41'!
+!Promise methodsFor: 'private' stamp: 'jpb 6/21/2020 13:26:19'!
 evaluateRejecter: rejecterBlock
-	^ rejecterBlock cull: error.! !
+	rejecterBlock numArgs >= 1 ifTrue: [ ^rejecterBlock value: error ].
+	
+	^rejecterBlock value! !
 
-!Promise methodsFor: 'private' stamp: 'fbs 5/20/2013 09:29'!
+!Promise methodsFor: 'private' stamp: 'jpb 6/21/2020 13:25:59'!
 evaluateResolver: resolverBlock
-	^ resolverBlock cull: value.! !
+	resolverBlock numArgs >= 1 ifTrue: [ ^resolverBlock value: value ].
+	
+	^resolverBlock value! !
 
 !Promise methodsFor: 'initialize' stamp: 'fbs 5/26/2013 14:19'!
 initialize
@@ -493,9 +521,9 @@ initializeWithResolvedValue: anObject
 	self initialize.
 	self resolveWith: anObject.! !
 
-!Promise methodsFor: 'testing' stamp: 'tonyg 2/1/2018 09:57'!
-isPromise
-	^ true! !
+!Promise methodsFor: 'testing' stamp: 'jpb 6/21/2020 13:24:19'!
+is: aSymbol
+	^(#Promise = aSymbol) or: [super is: aSymbol ] ! !
 
 !Promise methodsFor: 'testing' stamp: 'fbs 5/20/2013 09:32'!
 isRejected
@@ -549,13 +577,13 @@ resolve
 	
 	self resolveWith: nil! !
 
-!Promise methodsFor: 'resolving' stamp: 'tonyg 1/24/2020 15:26'!
+!Promise methodsFor: 'resolving' stamp: 'jpb 6/21/2020 13:23:31'!
 resolveWith: arg
 	"Resolve this promise. If arg is itself a Promise, make this promise depend upon it,
 	as detailed in the Promises/A+ spec:
 		https://promisesaplus.com/#the-promise-resolution-procedure"
 
-	arg isPromise
+	(arg is: #Promise)
 		ifTrue: [
 			arg whenResolved: [:v | self resolveWith: v].
 			arg whenRejected: [:e | self rejectWith: e]]
@@ -658,3 +686,120 @@ ifRejected: aBlock
 unit: anObject
 	"Return a resolved Promise. #new is the other half of Promise's unit function; #new returns an unresolved Promise."
 	^ Promise basicNew initializeWithResolvedValue: anObject.! !
+
+!FutureMaker methodsFor: 'comparing' stamp: 'das 9/7/2005 10:10'!
+= anObject
+	^self == anObject! !
+
+!FutureMaker methodsFor: 'comparing' stamp: 'nice 12/24/2009 03:01'!
+hash
+	^self scaledIdentityHash! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'das 9/7/2005 10:08'!
+basicAt: index 
+	"Primitive. Assumes receiver is indexable. Answer the value of an 
+	indexable element in the receiver. Fail if the argument index is not an 
+	Integer or is out of bounds. Essential. Do not override in a subclass. See 
+	Object documentation whatIsAPrimitive."
+
+	<primitive: 60>
+	index isInteger ifTrue: [self errorSubscriptBounds: index].
+	index isNumber
+		ifTrue: [^self basicAt: index asInteger]
+		ifFalse: [self errorNonIntegerIndex]! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'das 9/7/2005 10:09'!
+basicAt: index put: value 
+	"Primitive. Assumes receiver is indexable. Store the second argument 
+	value in the indexable element of the receiver indicated by index. Fail 
+	if the index is not an Integer or is out of bounds. Or fail if the value is 
+	not of the right type for this kind of collection. Answer the value that 
+	was stored. Essential. Do not override in a subclass. See Object 
+	documentation whatIsAPrimitive."
+
+	<primitive: 61>
+	index isInteger
+		ifTrue: [(index >= 1 and: [index <= self size])
+					ifTrue: [self errorImproperStore]
+					ifFalse: [self errorSubscriptBounds: index]].
+	index isNumber
+		ifTrue: [^self basicAt: index asInteger put: value]
+		ifFalse: [self errorNonIntegerIndex]! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'das 9/7/2005 10:10'!
+basicSize
+	"Primitive. Answer the number of indexable variables in the receiver. 
+	This value is the same as the largest legal subscript. Essential. Do not 
+	override in any subclass. See Object documentation whatIsAPrimitive."
+
+	<primitive: 62>
+	"The number of indexable fields of fixed-length objects is 0"
+	^0! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'jcg 12/17/2009 23:20'!
+doesNotUnderstand: aMessage
+	"Package up the message and send it"
+	^myTarget futureSend: aMessage selector at: deltaMSecs args: aMessage arguments! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'eem 2/22/2019 16:27'!
+instVarAt: index 
+	"Primitive. Answer a fixed variable in an object. The numbering of the 
+	variables corresponds to the named instance variables. Fail if the index 
+	is not an Integer or is not the index of a fixed variable. Essential. See 
+	Object documentation whatIsAPrimitive."
+
+	<primitive: 173 error: ec>
+	self primitiveFailed! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'eem 2/22/2019 16:27'!
+instVarAt: anInteger put: anObject 
+	"Primitive. Store a value into a fixed variable in the receiver. The 
+	numbering of the variables corresponds to the named instance variables. 
+	Fail if the index is not an Integer or is not the index of a fixed variable. 
+	Answer the value stored as the result. Using this message violates the 
+	principle that each object has sovereign control over the storing of 
+	values into its instance variables. Essential. See Object documentation 
+	whatIsAPrimitive."
+
+	<primitive: 174 error: ec>
+	self primitiveFailed! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'das 9/7/2005 10:09'!
+isKindOf: aClass 
+	"--- needed for debugging ---"
+	self class == aClass
+		ifTrue: [^true]
+		ifFalse: [^self class inheritsFrom: aClass]! !
+
+!FutureMaker methodsFor: 'accessing' stamp: 'das 9/7/2005 10:09'!
+isMemberOf: aClass 
+	"Answer whether the receiver is an instance of the class, aClass."
+	^self class == aClass! !
+
+!FutureMaker methodsFor: 'testing' stamp: 'das 9/7/2005 10:09'!
+isText
+	^false! !
+
+!FutureMaker methodsFor: 'printing' stamp: 'das 9/7/2005 10:10'!
+printString
+	"Answer a String whose characters are a description of the receiver. 
+	If you want to print without a character limit, use fullPrintString."
+	^ self printStringLimitedTo: 50000! !
+
+!FutureMaker methodsFor: 'printing' stamp: 'das 9/7/2005 10:10'!
+printStringLimitedTo: limit
+	"Answer a String whose characters are a description of the receiver.
+	If you want to print without a character limit, use fullPrintString."
+	| limitedString |
+	limitedString := String streamContents: [:s | self printOn: s] limitedTo: limit.
+	limitedString size < limit ifTrue: [^ limitedString].
+	^ limitedString , '...etc...'! !
+
+!FutureMaker methodsFor: 'private' stamp: 'jcg 12/17/2009 23:20'!
+setDeltaMSecs: delta target: futureTarget
+	deltaMSecs := delta.
+	myTarget := futureTarget.! !
+
+!FutureMaker methodsFor: 'private' stamp: 'das 9/6/2005 12:29'!
+setTarget: aTarget
+	myTarget := aTarget.! !
