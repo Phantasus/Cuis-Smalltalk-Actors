@@ -20,6 +20,23 @@ queues and promises used in the original Actors package, I'll propably make
 packages out of them to depend and will rename some things in them.
 For example I dislike `SharedQueue2` that's a really unhelpful name.
 
+I added too the `FutureMaker` from Squeak. But what now seems to me to a
+problem is that there the concept of futures were intertwined into the
+compiler for efficiency reasons and use `Project` for sending the
+`future:send:at` message. That's unhelpful.
+
+In Squeak5.3 the message which sits a little bit over that is implented
+as: 
+
+````Smalltalk
+    futureSend: aSelector at: deltaMSecs args: args
+	    "Send a message deltaSeconds into the future (some implementations may requires 'deltaMSecs' to be zero).
+        Answers a Promise that will be resolved at some time in the future.  See comment in class FutureNode."
+	^Project current future: self send: aSelector at: deltaMSecs args: args.
+````
+
+that's annoying. Maybe I should just remove the concepts of futures.
+
 
 # Authors
 
