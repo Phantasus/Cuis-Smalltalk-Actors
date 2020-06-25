@@ -1,8 +1,8 @@
-'From Cuis 5.0 [latest update: #4191] on 21 June 2020 at 1:51:30 pm'!
+'From Cuis 5.0 [latest update: #4191] on 25 June 2020 at 1:20:48 pm'!
 'Description Contains models, datatypes for concurrency related processing. For example specialized kinds of queues and promises.
 
 License: MIT'!
-!provides: 'Concurrency-Kernel' 1 1!
+!provides: 'Concurrency-Kernel' 1 2!
 SystemOrganization addCategory: #'Concurrency-Kernel'!
 SystemOrganization addCategory: #'Concurrency-Kernel-Tests'!
 
@@ -36,6 +36,16 @@ TestCase subclass: #PromiseTest
 !classDefinition: 'PromiseTest class' category: #'Concurrency-Kernel-Tests'!
 PromiseTest class
 	instanceVariableNames: ''!
+
+!classDefinition: #FutureHandler category: #'Concurrency-Kernel'!
+Object subclass: #FutureHandler
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Concurrency-Kernel'!
+!classDefinition: 'FutureHandler class' category: #'Concurrency-Kernel'!
+FutureHandler class
+	instanceVariableNames: 'defaultInstance'!
 
 !classDefinition: #Promise category: #'Concurrency-Kernel'!
 Object subclass: #Promise
@@ -73,6 +83,9 @@ I am signalled when, during a Promise>>wait, the promise is rejected.
 	promise:		the promise itself.
 !
 
+!FutureHandler commentStamp: '<historical>' prior: 0!
+Baseclass for all different kinds of handlers which objects reference to handle futures. See #findFutureHandler on objects which let them define their own lookup scheme.!
+
 !Promise commentStamp: 'tonyg 1/31/2018 23:34' prior: 0!
 I represent the result of an asynchronous message.  Once the message is processed, I will be resolved to a value.  I am typically instantiated by invocations of #futureSend:at:args: (and not by #futureDo:atArgs:).
 
@@ -100,8 +113,8 @@ printOn: aStream
 postCopy
 	super postCopy.
 	monitor critical:
-		[items := items copy.
-		monitor := Monitor new]! !
+		[items _ items copy.
+		monitor _ Monitor new]! !
 
 !Promise methodsFor: 'monad' stamp: 'tonyg 1/28/2018 16:07'!
 >> resolvedBlock
@@ -127,19 +140,20 @@ printOn: aStream
 	"Append to the argument, aStream, a sequence of characters that  
 	identifies the receiver."
 	| title |
-	title := self class name.
+	title _ self class name.
 	aStream
 		nextPutAll: (title first isVowel ifTrue: ['an '] ifFalse: ['a ']);
 		nextPutAll: title! !
 
-!MonitoredSharedQueue methodsFor: 'accessing' stamp: 'ls 6/25/2005 14:07'!
+!MonitoredSharedQueue methodsFor: 'accessing' stamp: 'jpb 6/25/2020 11:53:36'!
 flush
-	self deprecated: 'use removeAll'.
+	self deprecatedMethod. "use removeAll".
+	
 	^self removeAll! !
 
-!MonitoredSharedQueue methodsFor: 'accessing' stamp: 'ls 6/25/2005 14:02'!
+!MonitoredSharedQueue methodsFor: 'accessing' stamp: 'jpb 6/25/2020 11:53:44'!
 flushAllSuchThat: aBlock
-	self deprecated: 'use removeAllSuchThat:'.
+	self deprecatedMethod. "use removeAllSuchThat".
 
 	^self removeAllSuchThat: aBlock! !
 
@@ -163,7 +177,7 @@ nextOrNilSuchThat: aBlock
 
 	^monitor critical: [
 		| index |
-		index := items findFirst: aBlock.
+		index _ items findFirst: aBlock.
 		index = 0 ifTrue: [
 			nil ]
 		ifFalse: [
@@ -200,8 +214,8 @@ removeAllSuchThat: aBlock
 
 !MonitoredSharedQueue methodsFor: 'initializing' stamp: 'ls 6/25/2005 13:48'!
 initialize
-	monitor := Monitor new.
-	items := OrderedCollection new.
+	monitor _ Monitor new.
+	items _ OrderedCollection new.
 ! !
 
 !MonitoredSharedQueue methodsFor: 'size' stamp: 'ls 6/25/2005 14:03'!
@@ -231,13 +245,13 @@ promise
 
 !BrokenPromise methodsFor: 'as yet unclassified' stamp: 'tonyg 2/17/2017 13:51'!
 promise: aPromise
-	promise := aPromise! !
+	promise _ aPromise! !
 
 !PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/23/2013 08:36'!
 testAnErrorInThenRejectsPromise
 	| p q |
-	p := Promise new.
-	q := p then: [:v | KeyNotFound signal].
+	p _ Promise new.
+	q _ p then: [:v | KeyNotFound signal].
 	p resolveWith: 1.
 	self deny: p isRejected description: 'Original Promise rejected'.
 	self assert: q isRejected description: 'Broken Promise not rejected'.! !
@@ -245,13 +259,13 @@ testAnErrorInThenRejectsPromise
 !PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/17/2013 18:26'!
 testCanRejectPromise
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	p rejectWith: Error new.! !
 
 !PromiseTest methodsFor: 'tests - monad' stamp: 'tonyg 1/29/2018 14:32'!
 testCannotRejectFulfilledPromise
 	| p |
-	p := Promise unit: 1.
+	p _ Promise unit: 1.
 	p rejectWith: Error new.
 	self assert: p isResolved.
 	self assert: 1 equals: p value.
@@ -260,8 +274,8 @@ testCannotRejectFulfilledPromise
 !PromiseTest methodsFor: 'tests - monad' stamp: 'tonyg 1/29/2018 14:34'!
 testCannotResolveaRejectedPromise
 	| p e |
-	p := Promise new.
-	e := Error new.
+	p _ Promise new.
+	e _ Error new.
 	p rejectWith: e.
 	p resolveWith: 1.
 	self assert: p isRejected.
@@ -275,9 +289,9 @@ testCollapsesChainsOfPromises
 	It is convenient to accept non-promise values and automatically lift them into the monad,
 	but we must also ensure we treat the case where a `then:`-block yields a Promise correctly."
 	| p q r |
-	p := Promise new.
-	q := p then: [:v | Promise unit: v * 2].
-	r := q then: [:v | Promise unit: v + 1].
+	p _ Promise new.
+	q _ p then: [:v | Promise unit: v * 2].
+	r _ q then: [:v | Promise unit: v + 1].
 	p resolveWith: 4.
 	self assert: 4 * 2 equals: q value.
 	self assert: (4 * 2 + 1) equals: r value.! !
@@ -285,7 +299,7 @@ testCollapsesChainsOfPromises
 !PromiseTest methodsFor: 'tests - monad' stamp: 'tonyg 1/31/2018 23:33'!
 testFirstResolutionWins
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	p resolveWith: 1.
 	p resolveWith: 2.
 	self assert: p isResolved.
@@ -295,9 +309,9 @@ testFirstResolutionWins
 !PromiseTest methodsFor: 'tests - monad' stamp: 'jpb 6/21/2020 13:51:15'!
 testRejectWithInvokesErrorHandlers
 	| p error returnedError |
-	returnedError := nil.
-	error := Error new.
-	p := Promise ifRejected: [:e | returnedError := e].
+	returnedError _ nil.
+	error _ Error new.
+	p _ Promise ifRejected: [:e | returnedError _ e].
 	p rejectWith: error.
 	
 	self assert: returnedError notNil description: 'Error block did not run.'.
@@ -307,9 +321,9 @@ testRejectWithInvokesErrorHandlers
 !PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/23/2013 17:35'!
 testThenPermitsChainingOfPromises
 	| p q r |
-	p := Promise new.
-	q := p then: [:v | v * 2].
-	r := q then: [:v | v + 1].
+	p _ Promise new.
+	q _ p then: [:v | v * 2].
+	r _ q then: [:v | v + 1].
 	p resolveWith: 4.
 	self assert: 4 * 2 equals: q value.
 	self assert: (4 * 2 + 1) equals: r value.! !
@@ -317,34 +331,34 @@ testThenPermitsChainingOfPromises
 !PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/15/2013 17:23'!
 testThenReturnsaPromise
 	| p |
-	p := Promise new then: [:v | v * 2].
+	p _ Promise new then: [:v | v * 2].
 	self assert: Promise equals: p class.! !
 
 !PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/15/2013 17:12'!
 testUnitReturnsaPromise
 	| p |
-	p := Promise unit: 1.
+	p _ Promise unit: 1.
 	self assert: Promise equals: p class.
 	self assert: p isResolved.! !
 
 !PromiseTest methodsFor: 'tests - monad' stamp: 'tonyg 2/17/2017 14:04'!
 testWaitForRejection
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	[ (Delay forMilliseconds: 1) wait. p rejectWith: Error new ] fork.
 	self should: [ p wait ] raise: BrokenPromise.! !
 
 !PromiseTest methodsFor: 'tests - monad' stamp: 'tonyg 2/17/2017 14:01'!
 testWaitForResolution
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	[ (Delay forMilliseconds: 1) wait. p resolveWith: #ok ] fork.
 	self assert: [ p wait = #ok ]! !
 
 !PromiseTest methodsFor: 'tests - monad' stamp: 'tonyg 2/17/2017 14:04'!
 testWaitRejectionYieldsCorrectBrokenPromise
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	[ (Delay forMilliseconds: 1) wait. p rejectWith: Error new ] fork.
 	[ p wait ] on: BrokenPromise do: [ :bp | ^ self assert: [ bp promise == p ] ].
 	self fail: 'Should not reach this point'! !
@@ -352,9 +366,9 @@ testWaitRejectionYieldsCorrectBrokenPromise
 !PromiseTest methodsFor: 'tests - monad' stamp: 'fbs 5/26/2013 14:13'!
 testifRejectedDoesNotRunBlockIfPromiseResolves
 	| p q error |
-	error := nil.
-	p := Promise new.
-	q := p ifRejected: [:e | error := e].
+	error _ nil.
+	p _ Promise new.
+	q _ p ifRejected: [:e | error _ e].
 	p resolveWith: 1.
 	self deny: q isRejected.
 	self assert: nil equals: error.! !
@@ -362,9 +376,9 @@ testifRejectedDoesNotRunBlockIfPromiseResolves
 !PromiseTest methodsFor: 'tests - monad' stamp: 'jpb 6/21/2020 13:50:33'!
 testifRejectedRunsBlockIfPromiseFails
 	| p q error |
-	error := nil.
-	p := Promise new.
-	q := p ifRejected: [:e | error := e].
+	error _ nil.
+	p _ Promise new.
+	q _ p ifRejected: [:e | error _ e].
 	p rejectWith: Error new.
 	self assert: q isRejected.
 	self assert: Error equals: error class.! !
@@ -372,17 +386,17 @@ testifRejectedRunsBlockIfPromiseFails
 !PromiseTest methodsFor: 'tests' stamp: 'jcg 4/5/2010 00:36'!
 testChainedResolvers
 	| promise1 promise2 result |
-	promise1 := Promise new.
-	promise2 := Promise new.
+	promise1 _ Promise new.
+	promise2 _ Promise new.
 	promise1 whenResolved: [:bool | promise2 resolveWith: bool not].
-	promise2 whenResolved: [:bool | result := bool].
+	promise2 whenResolved: [:bool | result _ bool].
 	promise1 resolveWith: false.
 	self should: [result].! !
 
 !PromiseTest methodsFor: 'tests' stamp: 'tonyg 2/13/2018 11:30'!
 testFulfillWithError
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	p fulfillWith: [ 1 / 0 ] passErrors: false.
 	self assert: p isRejected.
 	self assert: ZeroDivide equals: p error class.! !
@@ -390,7 +404,7 @@ testFulfillWithError
 !PromiseTest methodsFor: 'tests' stamp: 'tonyg 2/13/2018 16:40'!
 testFulfillWithHaltAndResult
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	[
 		p fulfillWith: [ self halt. 3 + 4 ]
 	] on: Halt do: [:ex | ex resume].
@@ -400,7 +414,7 @@ testFulfillWithHaltAndResult
 !PromiseTest methodsFor: 'tests' stamp: 'tonyg 2/13/2018 11:24'!
 testFulfillWithResult
 	| p |
-	p := Promise new.
+	p _ Promise new.
 	p fulfillWith: [ 3 + 4 ].
 	self assert: p isResolved.
 	self assert: 7 equals: p value.! !
@@ -408,10 +422,10 @@ testFulfillWithResult
 !PromiseTest methodsFor: 'tests' stamp: 'jcg 4/5/2010 00:31'!
 testMultipleResolvers
 	| promise sum |
-	sum := 0.
-	promise := Promise new.
+	sum _ 0.
+	promise _ Promise new.
 	5 timesRepeat: [
-		promise whenResolved: [:val | sum := sum + val].
+		promise whenResolved: [:val | sum _ sum + val].
 	].
 	promise resolveWith: 5.
 	self should: [sum = 25].
@@ -420,9 +434,9 @@ testMultipleResolvers
 !PromiseTest methodsFor: 'tests' stamp: 'fbs 5/23/2013 08:28'!
 testSingleResolver
 	| promise sum |
-	sum := 0.
-	promise := Promise new.
-	promise whenResolved: [:val | sum := sum + val].
+	sum _ 0.
+	promise _ Promise new.
+	promise whenResolved: [:val | sum _ sum + val].
 	promise resolveWith: 5.
 	self assert: 5 equals: sum.
 	! !
@@ -430,7 +444,7 @@ testSingleResolver
 !PromiseTest methodsFor: 'tests' stamp: 'tonyg 2/9/2018 11:45'!
 testTimeout
 	| promise |
-	promise := Promise new.
+	promise _ Promise new.
 	self shouldnt: [promise waitTimeoutMSecs: 1].
 	self shouldnt: [promise isResolved].
 	self shouldnt: [promise isRejected].
@@ -442,7 +456,7 @@ testTimeout
 !PromiseTest methodsFor: 'tests' stamp: 'tonyg 2/9/2018 11:47'!
 testTimeoutRejected
 	| promise |
-	promise := Promise new.
+	promise _ Promise new.
 	self shouldnt: [promise waitTimeoutMSecs: 1].
 	self shouldnt: [promise isResolved].
 	self shouldnt: [promise isRejected].
@@ -451,46 +465,95 @@ testTimeoutRejected
 	self shouldnt: [promise isResolved].
 	self should: [promise isRejected].! !
 
-!PromiseTest methodsFor: 'tests - future' stamp: 'tonyg 2/13/2018 15:35'!
+!PromiseTest methodsFor: 'tests - future' stamp: 'jpb 6/25/2020 13:07:20'!
 testFutureRejectionInvisibleError
 	| p |
-	p := 1 future / 0.
+	p _ 1 future / 0.
 	p whenRejected: []. "Installing a rejection handler is enough to cause the exception to be swallowed."
-	self assert: (self waitUntil: [p isRejected] orCycleCount: 100).
+	self assert: (self waitUntil: [p isRejected] orCycleCount: 1000).
 	self assert: p isRejected.
 	self assert: ZeroDivide equals: p error class.! !
 
-!PromiseTest methodsFor: 'tests - future' stamp: 'tonyg 2/13/2018 15:34'!
+!PromiseTest methodsFor: 'tests - future' stamp: 'jpb 6/25/2020 13:04:42'!
 testFutureRejectionVisibleError
 	| p |
-	p := 1 future / 0.
+	p _ 1 future / 0.
 	[
 		self assert: (self waitUntil: [p isRejected] orCycleCount: 100)
 	] on: ZeroDivide do: [:ex | "Fall through." ].
+
 	self assert: p isRejected.
 	self assert: ZeroDivide equals: p error class.! !
 
 !PromiseTest methodsFor: 'tests - future' stamp: 'tonyg 2/13/2018 11:10'!
 testFutureResolution
 	| p |
-	p := 3 future + 4.
+	p _ 3 future + 4.
 	self assert: (self waitUntil: [p isResolved] orCycleCount: 100).
 	self assert: p isResolved.
 	self assert: 7 equals: p value.! !
 
-!PromiseTest methodsFor: 'private' stamp: 'mt 9/18/2019 11:50'!
+!PromiseTest methodsFor: 'private' stamp: 'jpb 6/25/2020 13:19:06'!
 waitUntil: aBlock orCycleCount: anInteger
 	"This is a gross hack that depends on running the tests in Morphic.
 	We simply repeatedly do a cycle of the interaction loop, which happens
 	to also be the way that the queue of pending futures gets serviced."
 	| counter |
-	counter := 0.
+	counter _ 0.
 	[
 		aBlock value ifTrue: [^ true].
-		Project current world doOneSubCycle.
-		counter := counter + 1.
-		counter >= anInteger ifTrue: [^ false].
+		UISupervisor ui doOneCycle.
+		counter _ counter + 1.
+		counter >= anInteger ifTrue: [^ false]
 	] repeat! !
+
+!FutureHandler methodsFor: 'future callbacks' stamp: 'jpb 6/25/2020 13:02:14'!
+future: receiver send: aSelector at: deltaMSecs args: args
+	"Send a message deltaSeconds into the future.  Answers a Promise that will be resolved at some time in the future."
+	| newPromise closure |
+	newPromise _ Promise new.
+	closure _ [newPromise fulfillWith: [receiver perform: aSelector withArguments: args]].
+	
+	deltaMSecs = 0
+		ifTrue: [ UISupervisor whenUIinSafeState: closure ]
+		ifFalse: [
+			[	(Delay forMilliseconds: deltaMSecs) wait.
+				self addDeferredUIMessage: 
+					closure
+			] forkAt: Processor userSchedulingPriority + 1.
+		].
+	
+	^newPromise! !
+
+!FutureHandler class methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 12:53:17'!
+default
+	"Returns a default instance used for handling future callbacks"
+	defaultInstance ifNil: [ defaultInstance _ self new ].
+	^defaultInstance! !
+
+!Promise methodsFor: 'monad' stamp: 'tonyg 1/28/2018 15:54'!
+>>= resolvedBlock
+	"Alias for `then:` allowing convenient chaining."
+	^ self then: resolvedBlock! !
+
+!Promise methodsFor: 'monad' stamp: 'fbs 5/26/2013 14:17'!
+ifRejected: errBlock
+	^ self then: [:ignored | "Do nothing"] ifRejected: errBlock.! !
+
+!Promise methodsFor: 'monad' stamp: 'tonyg 1/29/2018 14:12'!
+then: resolvedBlock
+	^ self then: resolvedBlock ifRejected: [:e | "Pass rejection reason along" e].! !
+
+!Promise methodsFor: 'monad' stamp: 'fbs 5/23/2013 20:26'!
+then: resolvedBlock ifRejected: errBlock
+	"Return a Promise that, if it resolves, runs the resolvedBlock. If resolution throws an Exception, it runs the errBlock."
+	| p |
+	p _ Promise new.
+	self whenResolved: [:v |
+		[p resolveWith: (resolvedBlock value: v)]
+			on: Error do: [:e | p rejectWith: e]].
+	self whenRejected: [:e | p rejectWith: (errBlock value: e)].
+	^ p.! !
 
 !Promise methodsFor: 'private' stamp: 'jpb 6/21/2020 13:26:19'!
 evaluateRejecter: rejecterBlock
@@ -506,15 +569,15 @@ evaluateResolver: resolverBlock
 
 !Promise methodsFor: 'initialize' stamp: 'fbs 5/26/2013 14:19'!
 initialize
-	state := #pending.
-	resolvers := #().
-	rejecters := #().
-	mutex := Mutex new.! !
+	state _ #pending.
+	resolvers _ #().
+	rejecters _ #().
+	mutex _ Mutex new.! !
 
 !Promise methodsFor: 'initialize' stamp: 'fbs 5/20/2013 20:37'!
 initializeWithIfRejected: aBlock
 	self initialize.
-	rejecters := {aBlock}.! !
+	rejecters _ {aBlock}.! !
 
 !Promise methodsFor: 'initialize' stamp: 'fbs 5/15/2013 17:37'!
 initializeWithResolvedValue: anObject
@@ -565,11 +628,11 @@ rejectWith: anObject
 	"Reject this promise."
 	mutex critical: [
 		(state == #pending) ifTrue: [ | worklist |
-			error := anObject.
-			state := #rejected.
-			worklist := rejecters.
-			resolvers := #().
-			rejecters := #().
+			error _ anObject.
+			state _ #rejected.
+			worklist _ rejecters.
+			resolvers _ #().
+			rejecters _ #().
 			worklist do: [:r | self evaluateRejecter: r]]]! !
 
 !Promise methodsFor: 'resolving' stamp: 'pre 12/17/2018 17:41'!
@@ -590,11 +653,11 @@ resolveWith: arg
 		ifFalse: [
 			mutex critical: [
 				(state == #pending) ifTrue: [ | worklist |
-					value := arg.
-					state := #fulfilled.
-					worklist := resolvers.
-					resolvers := #().
-					rejecters := #().
+					value _ arg.
+					state _ #fulfilled.
+					worklist _ resolvers.
+					resolvers _ #().
+					rejecters _ #().
 					worklist do: [:r | self evaluateResolver: r]]]]! !
 
 !Promise methodsFor: 'resolving' stamp: 'tonyg 2/11/2018 15:48'!
@@ -603,7 +666,7 @@ whenRejected: aBlock
 	aBlock numArgs <= 1 ifFalse: [self error: 'Must be 0- or 1-argument block'].
 	mutex critical: [
 		(state == #pending)
-			ifTrue: [rejecters := rejecters copyWith: aBlock]
+			ifTrue: [rejecters _ rejecters copyWith: aBlock]
 			ifFalse: [self isRejected ifTrue: [self evaluateRejecter: aBlock]]].
 	^ nil! !
 
@@ -613,7 +676,7 @@ whenResolved: aBlock
 	aBlock numArgs <= 1 ifFalse:[self error: 'Must be 0- or 1-argument block'].
 	mutex critical: [
 		(state == #pending)
-			ifTrue: [resolvers := resolvers copyWith: aBlock]
+			ifTrue: [resolvers _ resolvers copyWith: aBlock]
 			ifFalse: [self isResolved ifTrue: [self evaluateResolver: aBlock]]].
 	^ nil! !
 
@@ -629,7 +692,7 @@ value
 wait
 	"Wait unconditionally for this promise to become fulfilled or rejected."
 	| sema |
-	sema := Semaphore new.
+	sema _ Semaphore new.
 	self whenResolved:[sema signal].
 	self whenRejected:[sema signal].
 	sema wait.
@@ -642,10 +705,10 @@ waitTimeoutMSecs: msecs
 	"Wait for at most the given number of milliseconds for this promise to settle.
 	Answer true if it is resolved, false otherwise. False can therefore mean EITHER 'timeout' OR 'rejected'."
 	| sema delay |
-	sema := Semaphore new.
+	sema _ Semaphore new.
 	self whenResolved: [sema signal].
 	self whenRejected: [sema signal].
-	delay := Delay timeoutSemaphore: sema afterMSecs: msecs.
+	delay _ Delay timeoutSemaphore: sema afterMSecs: msecs.
 	[sema wait] ensure: [delay unschedule].
 	^ self isResolved.! !
 
@@ -653,30 +716,6 @@ waitTimeoutMSecs: msecs
 waitTimeoutSeconds: seconds
 	"Wait for at most the given number of seconds for this promise to resolve. Answer true if it is resolved, false otherwise."
 	^self waitTimeoutMSecs: seconds*1000! !
-
-!Promise methodsFor: 'monad' stamp: 'tonyg 1/28/2018 15:54'!
->>= resolvedBlock
-	"Alias for `then:` allowing convenient chaining."
-	^ self then: resolvedBlock! !
-
-!Promise methodsFor: 'monad' stamp: 'fbs 5/26/2013 14:17'!
-ifRejected: errBlock
-	^ self then: [:ignored | "Do nothing"] ifRejected: errBlock.! !
-
-!Promise methodsFor: 'monad' stamp: 'tonyg 1/29/2018 14:12'!
-then: resolvedBlock
-	^ self then: resolvedBlock ifRejected: [:e | "Pass rejection reason along" e].! !
-
-!Promise methodsFor: 'monad' stamp: 'fbs 5/23/2013 20:26'!
-then: resolvedBlock ifRejected: errBlock
-	"Return a Promise that, if it resolves, runs the resolvedBlock. If resolution throws an Exception, it runs the errBlock."
-	| p |
-	p := Promise new.
-	self whenResolved: [:v |
-		[p resolveWith: (resolvedBlock value: v)]
-			on: Error do: [:e | p rejectWith: e]].
-	self whenRejected: [:e | p rejectWith: (errBlock value: e)].
-	^ p.! !
 
 !Promise class methodsFor: 'instance creation' stamp: 'fbs 5/20/2013 20:37'!
 ifRejected: aBlock
@@ -686,6 +725,21 @@ ifRejected: aBlock
 unit: anObject
 	"Return a resolved Promise. #new is the other half of Promise's unit function; #new returns an unresolved Promise."
 	^ Promise basicNew initializeWithResolvedValue: anObject.! !
+
+!FutureMaker methodsFor: 'printing' stamp: 'das 9/7/2005 10:10'!
+printString
+	"Answer a String whose characters are a description of the receiver. 
+	If you want to print without a character limit, use fullPrintString."
+	^ self printStringLimitedTo: 50000! !
+
+!FutureMaker methodsFor: 'printing' stamp: 'das 9/7/2005 10:10'!
+printStringLimitedTo: limit
+	"Answer a String whose characters are a description of the receiver.
+	If you want to print without a character limit, use fullPrintString."
+	| limitedString |
+	limitedString _ String streamContents: [:s | self printOn: s] limitedTo: limit.
+	limitedString size < limit ifTrue: [^ limitedString].
+	^ limitedString , '...etc...'! !
 
 !FutureMaker methodsFor: 'comparing' stamp: 'das 9/7/2005 10:10'!
 = anObject
@@ -780,26 +834,27 @@ isMemberOf: aClass
 isText
 	^false! !
 
-!FutureMaker methodsFor: 'printing' stamp: 'das 9/7/2005 10:10'!
-printString
-	"Answer a String whose characters are a description of the receiver. 
-	If you want to print without a character limit, use fullPrintString."
-	^ self printStringLimitedTo: 50000! !
-
-!FutureMaker methodsFor: 'printing' stamp: 'das 9/7/2005 10:10'!
-printStringLimitedTo: limit
-	"Answer a String whose characters are a description of the receiver.
-	If you want to print without a character limit, use fullPrintString."
-	| limitedString |
-	limitedString := String streamContents: [:s | self printOn: s] limitedTo: limit.
-	limitedString size < limit ifTrue: [^ limitedString].
-	^ limitedString , '...etc...'! !
-
 !FutureMaker methodsFor: 'private' stamp: 'jcg 12/17/2009 23:20'!
 setDeltaMSecs: delta target: futureTarget
-	deltaMSecs := delta.
-	myTarget := futureTarget.! !
+	deltaMSecs _ delta.
+	myTarget _ futureTarget.! !
 
 !FutureMaker methodsFor: 'private' stamp: 'das 9/6/2005 12:29'!
 setTarget: aTarget
-	myTarget := aTarget.! !
+	myTarget _ aTarget.! !
+
+!Object methodsFor: '*Concurrency-Kernel' stamp: 'jpb 6/25/2020 12:50:58'!
+findFutureHandler
+	"Returns a future handler by some object defined lookup logic"
+	 ^FutureHandler default! !
+
+!Object methodsFor: '*Concurrency-Kernel' stamp: 'jpb 6/25/2020 12:43:01'!
+future
+	"See FutureMaker class comment."
+	^(FutureMaker new) 
+		setDeltaMSecs: 0.0 target: self! !
+
+!Object methodsFor: '*Concurrency-Kernel' stamp: 'jpb 6/25/2020 12:50:29'!
+futureSend: aSelector at: deltaMSecs args: args
+	"Send a message deltaSeconds into the future (some implementations may requires 'deltaMSecs' to be zero).  Answers a Promise that will be resolved at some time in the future.  See comment in class FutureNode."
+	^self findFutureHandler future: self send: aSelector at: deltaMSecs args: args.! !

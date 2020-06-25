@@ -9,6 +9,35 @@ can pick up where the previous one has left the project.
 
 # Entries
 
+## 25th June 2020 (jpb)
+
+Here is the actual implementation of `future:send:at:args:` in Squeak.
+This method has two implementations one on `Project` and the other on
+`MorphicProject`. I chose the `Project` implementation as this is more
+general. How am I going to deal with the situation, that Cuis doesn't implement
+projects?
+
+````Smalltalk
+future: receiver send: aSelector at: deltaMSecs args: args
+	"Send a message deltaSeconds into the future.  Answers a Promise that will be resolved at some time in the future."
+	| pr closure |
+	pr := Promise new.
+	closure := [pr fulfillWith: [receiver perform: aSelector withArguments: args]].
+	deltaMSecs = 0
+		ifTrue: [self addDeferredUIMessage: closure]
+		ifFalse: [
+			[	(Delay forMilliseconds: deltaMSecs) wait.
+				self addDeferredUIMessage: 
+					closure
+			] forkAt: Processor userSchedulingPriority + 1.
+		].
+	^pr
+````
+
+I chose to use a `FutureHandler` class, because that you still have some of the intended
+features of using `Project`. Dealing with Promises your own way.
+
+
 ## 21th June 2020 (jpb)
 
 Yesterday I added the squeak actors project from squeaksource and

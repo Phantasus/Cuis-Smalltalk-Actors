@@ -2,12 +2,23 @@
 
 This file records a description of changes, if known and cared about.
 
+## Update 0.0001b
+
+Affected files:
+
+	- Concurrency-Kernel 1.2
+
+Adds handling of futures. In particular adds `FutureHandler` and the
+`futureSend` methods. Makes the `PromiseTest` testcases pass more
+or less if you don't count the errors by late-firing promises.
+
+
 ## Update 0.0001a
 
 Affected files:
 
-- Actors 1.2
-- Concurrency-Kernel 1.1
+  - Actors 1.2
+  - Concurrency-Kernel 1.1
 
 Makes most of the `PromiseTest` testcases pass, only the ones which
 depend on working futures are still broken. Adds the `FutureMaker`
@@ -18,8 +29,8 @@ class from Squeak to the `Concurrency-Kernel`.
 
 Affected files:
 
-- Actors 1.1
-- Concurrency-Kernel 1.0
+  - Actors 1.1
+  - Concurrency-Kernel 1.0
 
 Adds the first file out from the packages which were taken from Squeak 5.3
 (contained in the Concurrency-Kernel) and the Squeak Actors (in Actors).
