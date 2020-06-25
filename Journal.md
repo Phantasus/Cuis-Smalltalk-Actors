@@ -37,6 +37,13 @@ future: receiver send: aSelector at: deltaMSecs args: args
 I chose to use a `FutureHandler` class, because that you still have some of the intended
 features of using `Project`. Dealing with Promises your own way.
 
+The Squeak Actors package tries to test the correct behaviour by forcing time passes
+by calling `doOneCycle` on the morphic world. This is on Cuis a not so good idea,
+as it's solved differently here and such tests don't work so well.
+
+Why are processes which are terminated with `Process terminateActive` not terminated?
+Because `isTerminated` returns in such cases `false`.
+
 
 ## 21th June 2020 (jpb)
 
