@@ -1,10 +1,10 @@
-'From Cuis 5.0 [latest update: #4191] on 25 June 2020 at 2:44:21 pm'!
+'From Cuis 5.0 [latest update: #4191] on 25 June 2020 at 8:34:16 pm'!
 'Description Port of Squeak Actors (See https://tonyg.github.io/squeak-actors) to Cuis.
 
 License: MIT
 Copyright (c) 2020 Josef Philip Bernhart (Port)
 Copyright (c) 2018, 2019, 2020 Tony Garnock-Jones (Squeak Actors Author)'!
-!provides: 'Actors' 1 3!
+!provides: 'Actors' 1 4!
 !requires: 'Concurrency-Kernel' 1 0 nil!
 SystemOrganization addCategory: #Actors!
 SystemOrganization addCategory: #'Actors-Dataspace'!
@@ -1077,7 +1077,7 @@ link
 	self performInternally: (Message selector: #addLinkedActor: argument: thisProcess).
 ! !
 
-!ActorProcess methodsFor: 'monitoring and linking' stamp: 'tonyg 2/18/2017 19:19'!
+!ActorProcess methodsFor: 'monitoring and linking' stamp: 'jpb 6/25/2020 20:28:43'!
 monitor: aReference
 	"Public. Establish a one-way link so that when the receiver eventually terminates,
 	the Process that was active at the time of the call to #monitor: will receive a signal via
@@ -1624,21 +1624,21 @@ setUp
 tearDown
 	self disconnectTestUser.! !
 
-!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 20:12'!
+!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:32:55'!
 testLineBlankBlankNoLFDelay2
-	self testScenario: {'one', String lf, String lf, String lf. #pause} expected: {'one'. ''. ''}.! !
+	self testScenario: {'one', String lfString, String lfString, String lfString. #pause} expected: {'one'. ''. ''}.! !
 
-!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 20:12'!
+!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:32:44'!
 testLineBlankBlankNoLFNoDelay
-	self testScenario: {'one', String lf, String lf, String lf} expected: {'one'. ''. ''}.! !
+	self testScenario: {'one', String lfString, String lfString, String lfString} expected: {'one'. ''. ''}.! !
 
-!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 20:09'!
+!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:32:33'!
 testLineBlankNoLFDelay1
-	self testScenario: {'one', String lf. #pause. String lf} expected: {'one'. ''}.! !
+	self testScenario: {'one', String lfString. #pause. String lfString} expected: {'one'. ''}.! !
 
-!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 20:11'!
+!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:32:24'!
 testLineBlankNoLFNoDelay
-	self testScenario: {'one', String lf, String lf} expected: {'one'. ''}.! !
+	self testScenario: {'one', String lfString, String lfString} expected: {'one'. ''}.! !
 
 !ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 13:12'!
 testOneLineNoLFNoDelay
@@ -1655,17 +1655,17 @@ testScenario: instructions expected: lines
 	self assert: stanza key = testUserName.
 	self assert: stanza value asArray = lines asArray.! !
 
-!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 20:08'!
+!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:32:15'!
 testTwoLinesNoLFDelay1
-	self testScenario: {'one', String lf. #pause. 'two'} expected: {'one'. 'two'}.! !
+	self testScenario: {'one', String lfString. #pause. 'two'} expected: {'one'. 'two'}.! !
 
-!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 20:08'!
+!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:31:59'!
 testTwoLinesNoLFDelay2
-	self testScenario: {'one', String lf. 'two'. #pause} expected: {'one'. 'two'}.! !
+	self testScenario: {'one', String lfString. 'two'. #pause} expected: {'one'. 'two'}.! !
 
-!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 20:08'!
+!ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:32:04'!
 testTwoLinesNoLFNoDelay
-	self testScenario: {'one', String lf. 'two'} expected: {'one'. 'two'}.! !
+	self testScenario: {'one', String lfString. 'two'} expected: {'one'. 'two'}.! !
 
 !ChatRoomTests class methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 13:06'!
 resources
@@ -1683,11 +1683,12 @@ testEmptyNextTimeoutNonzero
 testEmptyNextTimeoutZero
 	self assert: nil equals: (q nextTimeout: 0).! !
 
-!SharedQueueActorAdditionsTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/15/2018 09:46'!
+!SharedQueueActorAdditionsTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:29:29'!
 testFeedNextTimeoutNil
 	| p proc |
 	p _ Promise new.
-	proc _ [ p resolveWith: (q nextTimeout: nil) ] fork.
+	proc _ [ p resolveWith: (q nextTimeout: nil) ] newProcess.
+	proc resume.
 	[
 		(Delay forMilliseconds: 10) wait.
 		self assert: p isResolved not.
@@ -1700,11 +1701,13 @@ testFeedNextTimeoutNil
 		proc terminate.
 	]! !
 
-!SharedQueueActorAdditionsTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/15/2018 09:46'!
+!SharedQueueActorAdditionsTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:31:06'!
 testFeedNextTimeoutNonzero
 	| p proc |
 	p _ Promise new.
-	proc _ [ p resolveWith: (q nextTimeout: 10000) ] fork.
+	proc _ [ p resolveWith: (q nextTimeout: 10000) ] newProcess.
+	proc resume.
+	
 	[
 		(Delay forMilliseconds: 10) wait.
 		self assert: p isResolved not.
@@ -1774,10 +1777,11 @@ testChangeSignallingExnOK
 		otherActor3 ifNotNil: [otherActor3 actor kill].
 	]! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:42:27'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:30:46'!
 testChangeSignallingFromObject
 	| o result |
 	testActor blocking updateHandler: [:aspect | result _ aspect].
+	
 	o _ Object new.
 	o addDependent: testActor.
 	o changed: #harmless.
@@ -1865,13 +1869,14 @@ testLinkClientCrashWithIndirection
 	self waitForTerminationOf: testActor.
 	self assert: p isRejected.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/5/2018 12:42'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:16:36'!
 testLinkClientCrashWithRedirection
 	| a p |
 	a _ ActorProcess boot: [
 		testActor actor link.
 		p _ testActor slowlyRedirectToAddOneTo: 0.
 		Actor current kill].
+	
 	self waitForTerminationOf: a.
 	self waitForTerminationOf: testActor.
 	self assert: p isRejected.! !
@@ -1892,14 +1897,15 @@ testLocalRedirection
 	self assert: #nullaryRedirect equals: (testActor nullaryRedirect waitFor: 500 ifTimedOut: [ #timeout ]).
 	self assert: #nullaryRedirect equals: (testActor indirectNullaryRedirect waitFor: 500 ifTimedOut: [ #timeout ]).! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:09'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:30:24'!
 testMonitorClientCrashWithIndirection
 	| a p fired reason |
 	a _ [
 		"Use a regular Process for convenient convention about monitor references."
 		"See Process >> triggerMonitor:on:withException:."
 		testActor actor monitor: [ :e | fired _ true. reason _ e ].
-		p _ testActor slowlyIndirectlyAddOneTo: 0] fork.
+		p _ testActor slowlyIndirectlyAddOneTo: 0] newProcess.
+	a resume.
 	
 	self waitForTerminationOf: a.
 	(Delay forMilliseconds: 10) wait.
@@ -1908,14 +1914,16 @@ testMonitorClientCrashWithIndirection
 	self assert: 1 equals: p wait.
 	self assert: nil equals: fired.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:18'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 20:30:00'!
 testMonitorClientCrashWithRedirection
 	| a p fired reason |
 	a _ [
 		"Use a regular Process for convenient convention about monitor references."
 		"See Process >> triggerMonitor:on:withException:."
 		testActor actor monitor: [ :e | fired _ true. reason _ e ].
-		p _ testActor slowlyRedirectToAddOneTo: 0] fork.
+		p _ testActor slowlyRedirectToAddOneTo: 0] newProcess.
+	a resume.
+	
 	self waitForTerminationOf: a.
 	(Delay forMilliseconds: 10) wait.
 	
@@ -1923,14 +1931,17 @@ testMonitorClientCrashWithRedirection
 	self assert: 1 equals: p wait.
 	self assert: nil equals: fired.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:27'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:16:12'!
 testMonitorServerCrash
 	| a p fired reason |
 	a _ [
 		"Use a regular Process for convenient convention about monitor references."
 		"See Process >> triggerMonitor:on:withException:."
 		testActor actor monitor: [ :e | fired _ true. reason _ e ].
-		p _ testActor divideOneBy: 0] fork.
+		p _ testActor divideOneBy: 0] newProcess.
+	
+	a resume.
+	
 	self waitForTerminationOf: a.
 	self waitForTerminationOf: testActor.
 	self waitUntil: [ p isResolved or: [p isRejected] ].
@@ -2007,17 +2018,18 @@ user: anObject
 	user _ anObject.
 ! !
 
-!ChatRoomTestResource methodsFor: 'as yet unclassified' stamp: 'tonyg 3/5/2017 16:05'!
+!ChatRoomTestResource methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:49:44'!
 setUp
 	| startTime |
 	accepting _ false.
 	room _ ChatRoom spawn.
 	startTime _ Time now.
 	[
-		((Time now subtractTime: startTime) asDuration > 2 seconds)
+		((Time now - startTime) > 2 seconds)
 			ifTrue: [
 				room actor kill.
 				self error: 'Unable to start ChatRoom listener'].
+			
 		room isListening wait
 	] whileFalse: [Processor yield].
 	user _ ChatRoomTestUser spawn.! !
@@ -2614,13 +2626,19 @@ resetAcceptProcess
 	acceptProcess _ nil.
 	self issueCredit: 0! !
 
-!ServerSocketActor methodsFor: 'private' stamp: 'tonyg 2/18/2017 16:25'!
+!ServerSocketActor methodsFor: 'private' stamp: 'jpb 6/25/2020 20:28:09'!
 setupSocket
 	socket ifNotNil: [socket destroy].
 	socket _ Socket newTCP.
 	socket initializeNetwork.
-	[socket bindTo: ((NetNameResolver addressForName: hostname) asSocketAddress port: portNumber)]
-		on: SocketPrimitiveFailed do: [:ex | ^ self reportSocketReady: false].
+	
+	self flag: #fixme.
+	
+	["FIX THIS: socket bindTo: ((NetNameResolver addressForName: hostname)
+			port: portNumber)"
+	]
+	on: SocketPrimitiveFailed do: [:ex | ^ self reportSocketReady: false].
+		
 	socket listenOn: portNumber backlogSize: backlog.
 	socket isValid ifFalse: [^ self reportSocketReady: false].
 	self reportSocketReady: true.! !
@@ -3414,13 +3432,13 @@ stopWith: aReason
 	(aReason isKindOf: Number) ifTrue: [aReason milliseconds wait].
 	super stopWith: aReason.! !
 
-!SimpleTestActor methodsFor: 'as yet unclassified' stamp: 'tonyg 2/13/2018 16:06'!
+!SimpleTestActor methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:45:26'!
 update: anAspect
-	^ updateHandler cull: anAspect cull: nil! !
+	^ updateHandler valueWithPossibleArgument: anAspect and: nil! !
 
-!SimpleTestActor methodsFor: 'as yet unclassified' stamp: 'tonyg 2/13/2018 16:06'!
+!SimpleTestActor methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:45:26'!
 update: anAspect with: anObject
-	^ updateHandler cull: anAspect cull: anObject! !
+	^ updateHandler valueWithPossibleArgument: anAspect and: anObject! !
 
 !SimpleTestActor methodsFor: 'as yet unclassified' stamp: 'tonyg 2/13/2018 16:05'!
 updateHandler: aBlock
@@ -3429,10 +3447,6 @@ updateHandler: aBlock
 !ActorCallback methodsFor: 'as yet unclassified' stamp: 'tonyg 2/12/2018 22:24'!
 cull: firstArg
 	^ self promiseFor: [ block cull: firstArg ]! !
-
-!ActorCallback methodsFor: 'as yet unclassified' stamp: 'tonyg 1/27/2020 15:45'!
-cull: firstArg cull: secondArg
-	^ self promiseFor: [ block cull: firstArg cull: secondArg ]! !
 
 !ActorCallback methodsFor: 'as yet unclassified' stamp: 'tonyg 2/12/2018 22:13'!
 initializeActor: anActor block: aBlock
@@ -3465,6 +3479,10 @@ value: firstArg value: secondArg
 !ActorCallback methodsFor: 'as yet unclassified' stamp: 'tonyg 2/12/2018 22:23'!
 valueWithArguments: anArray
 	^ self promiseFor: [ block valueWithArguments: anArray ]! !
+
+!ActorCallback methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:45:26'!
+valueWithPossibleArgument: firstArg and: secondArg
+	^ self promiseFor: [ block valueWithPossibleArgument: firstArg and: secondArg ]! !
 
 !ActorCallback class methodsFor: 'as yet unclassified' stamp: 'tonyg 1/27/2020 12:52'!
 wrap: aBlock
@@ -3847,19 +3865,19 @@ topic: anObject
 
 	topic _ anObject.! !
 
-!SimpleDataspaceFilter methodsFor: 'as yet unclassified' stamp: 'tonyg 1/27/2020 15:39'!
+!SimpleDataspaceFilter methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:45:26'!
 assert: topic value: value
 	(filterBlock value: topic value: value) ifTrue: [
-		assertionHandler cull: topic cull: value]! !
+		assertionHandler valueWithPossibleArgument: topic and: value]! !
 
 !SimpleDataspaceFilter methodsFor: 'as yet unclassified' stamp: 'tonyg 1/27/2020 13:23'!
 cleanup: dataspace
 	dataspace cleanupFilter: self! !
 
-!SimpleDataspaceFilter methodsFor: 'as yet unclassified' stamp: 'tonyg 1/27/2020 15:39'!
+!SimpleDataspaceFilter methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 19:45:26'!
 retract: topic value: value
 	(filterBlock value: topic value: value) ifTrue: [
-		retractionHandler cull: topic cull: value]! !
+		retractionHandler valueWithPossibleArgument: topic and: value]! !
 
 !SimpleDataspaceFilter methodsFor: 'accessing' stamp: 'tonyg 1/27/2020 13:00'!
 assertionHandler: anObject
@@ -4209,10 +4227,10 @@ triggerLinkTo: peer withExitReason: aReason
 	"Convention: vanilla processes are just killed when a linked peer exits abnormally."
 	aReason ifNotNil: [self terminate].! !
 
-!Process methodsFor: '*Actors-private' stamp: 'tonyg 2/12/2018 17:21'!
+!Process methodsFor: '*Actors-private' stamp: 'jpb 6/25/2020 19:45:26'!
 triggerMonitor: aReference on: peer withExitReason: aReason
 	"Private. Called from ActorProcess>>#signalMonitor:actor:, which is invoked indirectly
 	during Actor cleanup, in order to notify the receiver that `peer` has just terminated."
 
 	"Convention: vanilla processes should give a block as a reference argument to ActorProcess>>#monitor:."
-	[ aReference cull: aReason cull: peer  ] fork! !
+	[ aReference valueWithPossibleArgument: aReason and: peer  ] fork! !
