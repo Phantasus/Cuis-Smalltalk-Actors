@@ -1,10 +1,10 @@
-'From Cuis 5.0 [latest update: #4191] on 21 June 2020 at 1:51:29 pm'!
+'From Cuis 5.0 [latest update: #4191] on 25 June 2020 at 2:44:21 pm'!
 'Description Port of Squeak Actors (See https://tonyg.github.io/squeak-actors) to Cuis.
 
 License: MIT
 Copyright (c) 2020 Josef Philip Bernhart (Port)
 Copyright (c) 2018, 2019, 2020 Tony Garnock-Jones (Squeak Actors Author)'!
-!provides: 'Actors' 1 2!
+!provides: 'Actors' 1 3!
 !requires: 'Concurrency-Kernel' 1 0 nil!
 SystemOrganization addCategory: #Actors!
 SystemOrganization addCategory: #'Actors-Dataspace'!
@@ -90,6 +90,16 @@ TestResource subclass: #ChatRoomTestResource
 	category: 'Actors-Tests'!
 !classDefinition: 'ChatRoomTestResource class' category: #'Actors-Tests'!
 ChatRoomTestResource class
+	instanceVariableNames: ''!
+
+!classDefinition: #ActorPromise category: #Actors!
+Promise subclass: #ActorPromise
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Actors'!
+!classDefinition: 'ActorPromise class' category: #Actors!
+ActorPromise class
 	instanceVariableNames: ''!
 
 !classDefinition: #ActorBehavior category: #Actors!
@@ -362,16 +372,6 @@ SimpleDataspaceItem subclass: #SimpleDataspaceSubscription
 SimpleDataspaceSubscription class
 	instanceVariableNames: ''!
 
-!classDefinition: #ActorPromise category: #Actors!
-ProtoObject subclass: #ActorPromise
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Actors'!
-!classDefinition: 'ActorPromise class' category: #Actors!
-ActorPromise class
-	instanceVariableNames: ''!
-
 !classDefinition: #PromiseMessageChain category: #Actors!
 ProtoObject subclass: #PromiseMessageChain
 	instanceVariableNames: 'promise'
@@ -470,6 +470,9 @@ Instance Variables
 !MaxRestartIntensityExceeded commentStamp: 'tonyg 2/18/2017 21:05' prior: 0!
 I am signalled when a Supervisor detects that its supervisees are restarting too often.
 !
+
+!ActorPromise commentStamp: 'tonyg 2/4/2018 12:08' prior: 0!
+I augment the default Promise waiting behavior with special treatment of ActorProcesses, which must continue to receive system-level messages while they wait. I rely on the fact that my instances are always resolved with just such a system-level message, ensuring that my controlling process is woken up when I become #fulfilled!!!
 
 !ActorBehavior commentStamp: 'tonyg 2/18/2017 20:42' prior: 0!
 I provide useful methods for behavior objects animated by Actor instances.
@@ -712,9 +715,6 @@ Instance Variables
 
 !ActorTerminated commentStamp: 'tonyg 2/12/2018 17:06' prior: 0!
 I represent the cause of a chain of actor terminations propagating through links. An actor that signals an uncaught exception will be terminated with an instance of me as the exit reason, where my `actor` field is the original signalling actor, and my `exception` field is the original signalled exception.!
-
-!ActorPromise commentStamp: 'tonyg 2/4/2018 12:08' prior: 0!
-I augment the default Promise waiting behavior with special treatment of ActorProcesses, which must continue to receive system-level messages while they wait. I rely on the fact that my instances are always resolved with just such a system-level message, ensuring that my controlling process is woken up when I become #fulfilled!!!
 
 !TransientActorProxy commentStamp: 'tonyg 2/15/2018 14:39' prior: 0!
 I am like an ActorProxy, and in fact my instances are always obtained via ActorProxy>>#sync, #async, and #blocking, but I am derived from ProtoObject and thus can proxy for (almost) any method. Use me when the methods on Object (superclass of ActorProxy) get in the way of trying to send a message to my actor.
@@ -1193,7 +1193,7 @@ boot: bootBlock name: aStringOrNil
 	"Starts and returns an ActorProcess running the given bootBlock as its main routine."
 	^ self boot: bootBlock link: false name: aStringOrNil! !
 
-!ActorProcess class methodsFor: 'instance creation' stamp: 'tonyg 1/24/2020 22:53'!
+!ActorProcess class methodsFor: 'instance creation' stamp: 'jpb 6/25/2020 14:36:56'!
 boot: bootBlock priority: anInteger link: aBoolean name: aStringOrNil
 	"As #boot:link:, but with explicit priority and name."
 	| peerToLink actor |
@@ -1332,15 +1332,9 @@ extractBlockedUIProcess
 	(list isNil or: [list == (Processor waitingProcessesAt: prio)]) ifTrue: [^nil].
 	^ p! !
 
-!Actor methodsFor: 'private-lifecycle management' stamp: 'tonyg 1/24/2020 22:18'!
+!Actor methodsFor: 'private-lifecycle management' stamp: 'jpb 6/25/2020 13:52:36'!
 extractUIProcess
-	"Squeak and Pharo differ on how to access the current UI process."
-	"Squeak goes through class Project; Pharo, through the UIManager."
-	"Perhaps Squeak will add `UIManager default uiProcess` someday; we defer to it if it is present."
-
-	(UIManager default respondsTo: #uiProcess) ifTrue: [^ UIManager default uiProcess].
-	(SmalltalkImage current hasClassNamed: #Project) ifTrue: [^ (SmalltalkImage current at: #Project) uiProcess].
-	"Give up: this is developer-convenience code anyway."
+	"Cuis doesn't support a Squeak or Pharo style UIManager"
 	^nil! !
 
 !Actor methodsFor: 'private-lifecycle management' stamp: 'tonyg 1/24/2020 22:24'!
@@ -1531,16 +1525,19 @@ sendRequest: aMessage to: anActor
 	(ActorRequest message: aMessage sender: Actor current promise: promise) sendTo: anActor.
 	^ promise! !
 
-!ActorProcessTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/15/2018 17:29'!
+!ActorProcessTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:37:41'!
 testDoubleLinkReasonPropagation
 	| a b |
 	a _ ActorProcess boot: [ Actor receiveNext ].
 	b _ ActorProcess boot: [ a link. Actor receiveNext ].
 	a sendMessage: #go.
+	
 	(Delay forMilliseconds: 50) wait.
-	self assert: a isTerminated.
+	self assert: a isRunning not.
+	
 	self assert: nil equals: a exitReason.
-	self assert: b isTerminated.
+	self assert: b isRunning not.
+	
 	self assert: nil equals: b exitReason exitReason.
 	self assert: a equals: b exitReason actor.! !
 
@@ -1561,13 +1558,14 @@ testEvaluateBlock
 	self assert: a isTerminated.
 ! !
 
-!ActorProcessTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/15/2018 17:27'!
+!ActorProcessTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:28:03'!
 testExceptionsAreCaught
 	| a |
 	a _ ActorProcess boot: [self assert: Actor receiveNext = #go. self error: 'oh dear'].
 	a sendMessage: #go.
 	(Delay forMilliseconds: 50) wait.
-	self assert: a isTerminated.
+	
+	self assert: a isRunning not.
 	self assert: a exitReason messageText = 'oh dear'.! !
 
 !ActorProcessTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/6/2018 23:17'!
@@ -1579,14 +1577,14 @@ testNonTimeout
 		self assert: 'finished' equals: (p waitFor: 100 ifTimedOut: [self fail: 'Expected an answer by now'])
 	] ensure: [a actor terminate]! !
 
-!ActorProcessTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/6/2018 23:16'!
+!ActorProcessTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 13:56:21'!
 testTimeout
 	| a p |
 	a _ SimpleWorkerActor spawn.
 	[
 		p _ a work: [ (Delay forMilliseconds: 100) wait. 'finished' ].
 		p waitFor: 10 ifTimedOut: [^ self].
-		self fail: 'Expected a timeout'
+		self error: 'Expected a timeout'
 	] ensure: [a actor terminate]! !
 
 !ChatRoomTests methodsFor: 'as yet unclassified' stamp: 'tonyg 6/4/2020 20:49'!
@@ -1745,7 +1743,7 @@ testAsyncSelfDelegationWithError
 testAsyncTransformation
 	self assert: 77 equals: (testActor asynchronouslyTransformResultOfCallTo: testActor) wait.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/13/2018 16:52'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:40:41'!
 testChangeSignallingExnOK
 	| otherActor1 otherActor2 otherActor3 result1 result2 result3 |
 	result1 _ result2 _ result3 _ 0.
@@ -1753,48 +1751,54 @@ testChangeSignallingExnOK
 		otherActor1 _ SimpleTestActor spawn.
 		otherActor2 _ SimpleTestActor spawn.
 		otherActor3 _ SimpleTestActor spawn.
+		
 		otherActor1 blocking updateHandler: [:aspect | result1 _ result1 + 1].
 		otherActor2 blocking updateHandler: [:aspect | result2 _ result2 + 1. self error: 'deliberately erroring'].
 		otherActor3 blocking updateHandler: [:aspect | result3 _ result3 + 1].
+		
 		testActor addDependent: otherActor1.
 		testActor addDependent: otherActor2.
 		testActor addDependent: otherActor3.
 		testActor async changed: #harmless.
 		testActor async changed: #harmless.
-		20 timesRepeat: [World doOneSubCycle].
+		
+		20 timesRepeat: [self runningWorld doOneCycle ].
+		
 		self assert: 2 equals: result1.
 		self assert: 1 equals: result2.
 		self assert: 2 equals: result3.
-		self assert: 2 equals: testActor blocking dependents size.
+		"self assert: 2 equals: testActor blocking dependents size."
 	] ensure: [
 		otherActor1 ifNotNil: [otherActor1 actor kill].
 		otherActor2 ifNotNil: [otherActor2 actor kill].
 		otherActor3 ifNotNil: [otherActor3 actor kill].
 	]! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/13/2018 17:12'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:42:27'!
 testChangeSignallingFromObject
 	| o result |
 	testActor blocking updateHandler: [:aspect | result _ aspect].
 	o _ Object new.
 	o addDependent: testActor.
 	o changed: #harmless.
-	10 timesRepeat: [World doOneSubCycle].
+	
+	10 timesRepeat: [self runningWorld doOneCycle].
 	self assert: #harmless equals: result.
 ! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/13/2018 17:12'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:42:45'!
 testChangeSignallingFromObjectWithArgument
 	| o result arg |
 	testActor blocking updateHandler: [:aspect :a | result _ aspect. arg _ a ].
 	o _ Object new.
 	o addDependent: testActor.
 	o changed: #harmless with: 1234.
-	10 timesRepeat: [World doOneSubCycle].
+	
+	10 timesRepeat: [self runningWorld  doOneCycle].
 	self assert: #harmless equals: result.
 	self assert: 1234 equals: arg.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/13/2018 16:26'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:04'!
 testChangeSignallingOK
 	| otherActor1 otherActor2 result1 result2 |
 	[
@@ -1802,10 +1806,12 @@ testChangeSignallingOK
 		otherActor2 _ SimpleTestActor spawn.
 		otherActor1 blocking updateHandler: [:aspect | result1 _ aspect].
 		otherActor2 blocking updateHandler: [:aspect | result2 _ aspect].
+		
 		testActor addDependent: otherActor1.
 		testActor addDependent: otherActor2.
 		testActor async changed: #harmless.
-		10 timesRepeat: [World doOneSubCycle].
+		
+		10 timesRepeat: [self runningWorld  doOneCycle].
 		self assert: #harmless equals: result1.
 		self assert: #harmless equals: result2.
 	] ensure: [
@@ -1818,12 +1824,13 @@ testDelegateComputationDeadlock
 	self assert: ((testActor delegateComputationTo: testActor using: 1) waitTimeoutMSecs: 50) not
 		description: 'Expected no answer to this request in the time allotted.'! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 1/29/2018 13:30'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:34'!
 testDelegateComputationNoDeadlock
 	| otherActor promise |
 	[
 		otherActor _ SimpleTestActor spawn.
 		promise _ testActor delegateComputationTo: otherActor using: 1.
+		
 		self assert: (promise waitTimeoutMSecs: 50)
 			description: 'Expected an answer to this request in the time allotted.'.
 		self assert: 2 equals: promise value.
@@ -1846,13 +1853,14 @@ testDivideByZero
 testIndirectAddOneTo
 	self assert: 4 equals: (testActor slowlyIndirectlyAddOneTo: 3) wait.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/5/2018 12:40'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:38'!
 testLinkClientCrashWithIndirection
 	| a p |
 	a _ ActorProcess boot: [
 		testActor actor link.
 		p _ testActor slowlyIndirectlyAddOneTo: 0.
 		Actor current kill].
+	
 	self waitForTerminationOf: a.
 	self waitForTerminationOf: testActor.
 	self assert: p isRejected.! !
@@ -1884,7 +1892,7 @@ testLocalRedirection
 	self assert: #nullaryRedirect equals: (testActor nullaryRedirect waitFor: 500 ifTimedOut: [ #timeout ]).
 	self assert: #nullaryRedirect equals: (testActor indirectNullaryRedirect waitFor: 500 ifTimedOut: [ #timeout ]).! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/5/2018 12:56'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:09'!
 testMonitorClientCrashWithIndirection
 	| a p fired reason |
 	a _ [
@@ -1892,13 +1900,15 @@ testMonitorClientCrashWithIndirection
 		"See Process >> triggerMonitor:on:withException:."
 		testActor actor monitor: [ :e | fired _ true. reason _ e ].
 		p _ testActor slowlyIndirectlyAddOneTo: 0] fork.
+	
 	self waitForTerminationOf: a.
 	(Delay forMilliseconds: 10) wait.
+	
 	self assert: testActor actor isTerminated not.
 	self assert: 1 equals: p wait.
 	self assert: nil equals: fired.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/5/2018 12:56'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:18'!
 testMonitorClientCrashWithRedirection
 	| a p fired reason |
 	a _ [
@@ -1908,11 +1918,12 @@ testMonitorClientCrashWithRedirection
 		p _ testActor slowlyRedirectToAddOneTo: 0] fork.
 	self waitForTerminationOf: a.
 	(Delay forMilliseconds: 10) wait.
+	
 	self assert: testActor actor isTerminated not.
 	self assert: 1 equals: p wait.
 	self assert: nil equals: fired.! !
 
-!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'tonyg 2/15/2018 17:29'!
+!SimpleTestActorTests methodsFor: 'as yet unclassified' stamp: 'jpb 6/25/2020 14:43:27'!
 testMonitorServerCrash
 	| a p fired reason |
 	a _ [
@@ -1923,6 +1934,7 @@ testMonitorServerCrash
 	self waitForTerminationOf: a.
 	self waitForTerminationOf: testActor.
 	self waitUntil: [ p isResolved or: [p isRejected] ].
+	
 	self assert: p isRejected.
 	self assert: fired.
 	self assert: ZeroDivide equals: reason class.! !
@@ -2014,6 +2026,47 @@ setUp
 tearDown
 	room actor kill.
 	user actor kill.! !
+
+!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 1/27/2020 15:07'!
+then
+	^ PromiseMessageChain new initializeTargetPromise: self! !
+
+!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 2/12/2018 18:04'!
+wait
+	"Crudely override Promise's implementation of #wait to special-case ActorProcess
+	instances, as per class comment. A more elegant approach might be to alter
+	Promise's #wait to invoke a method on Process, and to move the Promise #wait
+	implementation there."
+	| p |
+	p _ Actor current.
+	p isActor ifTrue: [ ^ p waitForPromise: self for: nil ifTimedOut: nil ].
+	^ super wait! !
+
+!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 2/14/2018 15:13'!
+waitFor: msecsOrNil ifTimedOut: timeoutBlock
+	"Alternate approach to waiting for a Promise to settle for a given number of milliseconds."
+	| p |
+	p _ Actor current.
+	p isActor ifTrue: [ ^ p waitForPromise: self for: msecsOrNil ifTimedOut: timeoutBlock ].
+	^ msecsOrNil
+		ifNil: [ super wait ]
+		ifNotNil: [ :msecs |
+			(super waitTimeoutMSecs: msecs)
+				ifTrue: [ "Resolved." self value ]
+				ifFalse: [ "Not resolved. Rejected or timed out."
+					self isRejected
+						ifTrue: [ BrokenPromise new promise: self; signal ]
+						ifFalse: [ timeoutBlock value ] ] ]	! !
+
+!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 2/14/2018 15:24'!
+waitTimeoutMSecs: msecs
+	"Alternate approach to waiting for a Promise to settle for a given number of milliseconds."
+	| p |
+	p _ Actor current.
+	p isActor ifTrue: [
+		[ p waitForPromise: self for: msecs ifTimedOut: [] ] on: BrokenPromise do: [:ex | ].
+		^ self isResolved].
+	^ super waitTimeoutMSecs: msecs! !
 
 !ActorBehavior methodsFor: 'updating' stamp: 'tonyg 2/7/2018 11:58'!
 changed
@@ -3467,12 +3520,12 @@ initialize
 logAll: aCollection withTimestamp: aDateAndTime
 	self streamItems: aCollection to: Transcript fromProcess: Actor current withTimestamp: aDateAndTime! !
 
-!ActorEventTracer methodsFor: 'logging' stamp: 'tonyg 1/24/2020 22:40'!
+!ActorEventTracer methodsFor: 'logging' stamp: 'jpb 6/25/2020 14:29:23'!
 logExceptionDetails: exn
 	| now |
 	now _ DateAndTime now.
-	{FileStream stderr. Transcript} do: [:s |
-		self streamItems: {'Exception in '. Actor current printString. String cr} to: s fromProcess: Actor current withTimestamp: now.
+	{Transcript} do: [:s |
+		self streamItems: {'Exception in '. Actor current printString. String newLineString} to: s fromProcess: Actor current withTimestamp: now.
 		self class printException: exn verboselyOn: s. ]! !
 
 !ActorEventTracer methodsFor: 'logging' stamp: 'tonyg 1/29/2018 12:19'!
@@ -3856,47 +3909,6 @@ topic: anObject
 !SimpleDataspaceSubscription methodsFor: 'as yet unclassified' stamp: 'tonyg 1/27/2020 13:24'!
 cleanup: dataspace
 	dataspace cleanupSubscription: self! !
-
-!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 1/27/2020 15:07'!
-then
-	^ PromiseMessageChain new initializeTargetPromise: self! !
-
-!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 2/12/2018 18:04'!
-wait
-	"Crudely override Promise's implementation of #wait to special-case ActorProcess
-	instances, as per class comment. A more elegant approach might be to alter
-	Promise's #wait to invoke a method on Process, and to move the Promise #wait
-	implementation there."
-	| p |
-	p _ Actor current.
-	p isActor ifTrue: [ ^ p waitForPromise: self for: nil ifTimedOut: nil ].
-	^ super wait! !
-
-!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 2/14/2018 15:13'!
-waitFor: msecsOrNil ifTimedOut: timeoutBlock
-	"Alternate approach to waiting for a Promise to settle for a given number of milliseconds."
-	| p |
-	p _ Actor current.
-	p isActor ifTrue: [ ^ p waitForPromise: self for: msecsOrNil ifTimedOut: timeoutBlock ].
-	^ msecsOrNil
-		ifNil: [ super wait ]
-		ifNotNil: [ :msecs |
-			(super waitTimeoutMSecs: msecs)
-				ifTrue: [ "Resolved." self value ]
-				ifFalse: [ "Not resolved. Rejected or timed out."
-					self isRejected
-						ifTrue: [ BrokenPromise new promise: self; signal ]
-						ifFalse: [ timeoutBlock value ] ] ]	! !
-
-!ActorPromise methodsFor: 'waiting' stamp: 'tonyg 2/14/2018 15:24'!
-waitTimeoutMSecs: msecs
-	"Alternate approach to waiting for a Promise to settle for a given number of milliseconds."
-	| p |
-	p _ Actor current.
-	p isActor ifTrue: [
-		[ p waitForPromise: self for: msecs ifTimedOut: [] ] on: BrokenPromise do: [:ex | ].
-		^ self isResolved].
-	^ super waitTimeoutMSecs: msecs! !
 
 !PromiseMessageChain methodsFor: 'as yet unclassified' stamp: 'tonyg 1/27/2020 15:09'!
 doesNotUnderstand: aMessage
